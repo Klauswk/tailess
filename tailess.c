@@ -8,13 +8,12 @@
 #define HOTUI_IMPLEMENTATION
 #include "hotui.h"
 
-
 typedef struct {
   char* line;
   size_t count;
 } Line;
 
-typedef struct  {
+typedef struct {
   Line* lines;
   size_t count;
   size_t capacity;
@@ -25,19 +24,19 @@ Lines lines = {0};
 void line_reserve(size_t expected_capacity) {
   if (expected_capacity > lines.capacity) {
     if (lines.capacity == 0) {
-       lines.capacity = 1000;
+       lines.capacity = 10;
     }
-    while(expected_capacity > lines.capacity) {
+    while(expected_capacity >= lines.capacity) {
       lines.capacity *= 2;
     }
-    lines.lines = realloc(lines.lines, lines.capacity * sizeof(Line));
+    lines.lines = realloc(lines.lines, (lines.capacity * sizeof(Line)));
 
     assert(lines.lines != NULL && "Out of memory");
   }
 }
 
 void push_line(Line line) {
-    line_reserve(line.count+1);
+    line_reserve(lines.count + 1);
     lines.lines[lines.count++] = line;
 }
 
@@ -93,7 +92,6 @@ int main() {
               strncpy(line.line, buffer2, b2_size);
               line.line[b2_size] = '\0';
               b2_size = 0;
-              //printf("%.*s\n", line.count, line.line);
               push_line(line);
             } else {
               buffer2[b2_size++] = buffer[i];
@@ -106,6 +104,7 @@ int main() {
           printf("%.*s\n", lines.lines[i].count, lines.lines[i].line);
           free(lines.lines[i].line);
         }
+        free(lines.lines);
         numberFds--;
         return 0;
       }
