@@ -85,7 +85,7 @@ int main() {
         ssize_t bytes = read(STDIN_FILENO, buffer, MAX_BUFFER_SIZE);
         if (bytes > 0) {
           for (int i = 0; i < bytes; i++) {
-            if (buffer[i] == '\n' || b2_size >= MAX_BUFFER_SIZE - 1) {
+            if (buffer[i] == '\n') {
               Line line = {0};
               line.count = b2_size + 1;
               line.line = malloc(sizeof(char) * line.count + 1);
@@ -94,6 +94,15 @@ int main() {
               b2_size = 0;
               push_line(line);
             } else {
+              if (b2_size >= MAX_BUFFER_SIZE - 1) {
+                Line line = {0};
+                line.count = b2_size + 1;
+                line.line = malloc(sizeof(char) * line.count + 1);
+                strncpy(line.line, buffer2, b2_size);
+                line.line[b2_size] = '\0';
+                b2_size = 0;
+                push_line(line);
+              }
               buffer2[b2_size++] = buffer[i];
             }
           }
