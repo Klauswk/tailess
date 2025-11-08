@@ -78,9 +78,21 @@ void hui_go_up_list_window(Hui_List_Window* list_window) {
   if (list_window->cursor > 0) list_window->cursor--;
 }
 
+void hui_page_up_list_window(Hui_List_Window* list_window) {
+  for (size_t i = 0; i < list_window->window.height; i++) {
+    hui_go_up_list_window(list_window);
+  }
+}
+
 void hui_go_down_list_window(Hui_List_Window* list_window) {
   size_t n = list_window->lines.count;
   if (n > 0 && list_window->cursor < n -1) list_window->cursor++;
+}
+
+void hui_page_down_list_window(Hui_List_Window* list_window) {
+  for (size_t i = 0; i < list_window->window.height; i++) {
+    hui_go_down_list_window(list_window);
+  }
 }
 
 int main() {
@@ -129,6 +141,10 @@ int main() {
           hui_go_down_list_window(&list_window);
         } else if (ch == 'k') {
           hui_go_up_list_window(&list_window);
+        } else if (ch == 2) {
+          hui_page_up_list_window(&list_window);
+        } else if (ch == 6) {
+          hui_page_down_list_window(&list_window);
         }
       } 
       
