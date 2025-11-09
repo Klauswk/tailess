@@ -34,8 +34,8 @@ void line_reserve(Lines* lines, size_t expected_capacity) {
 }
 
 void push_line(Lines* lines, Line line) {
-    line_reserve(lines, lines->count + 1);
-    lines->lines[lines->count++] = line;
+  line_reserve(lines, lines->count + 1);
+  lines->lines[lines->count++] = line;
 }
 
 #define MAX_BUFFER_SIZE 4096
@@ -54,8 +54,8 @@ Hui_List_Window hui_create_list_window(int width, int height, int y, int x) {
   };
 }
 
+
 void hui_draw_list_window(Hui_List_Window list_window) {
-  size_t width = list_window.window.width;
   size_t height = list_window.window.height;
   size_t x = list_window.window.x;
   size_t y = list_window.window.y;
@@ -63,7 +63,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
   for (size_t i = 0; i < height; i++) {
     int offset = i + list_window.cursor;
     Line line = list_window.lines.lines[offset];
-    hui_put_text_at_window(list_window.window, line.line, line.count, i, x);
+    hui_put_text_at_window(list_window.window, line.line, line.count, i + y, x);
   }
 }
 
@@ -86,12 +86,36 @@ void hui_page_up_list_window(Hui_List_Window* list_window) {
 
 void hui_go_down_list_window(Hui_List_Window* list_window) {
   size_t n = list_window->lines.count;
-  if (n > 0 && list_window->cursor < n -1) list_window->cursor++;
+  size_t cursor = list_window->cursor;
+  size_t height = list_window->window.height;
+
+  if (n > height && cursor > n - height) {
+  return ;
+  } 
+
+  if (n > 0 && cursor < n -1) list_window->cursor++;
 }
 
 void hui_page_down_list_window(Hui_List_Window* list_window) {
   for (size_t i = 0; i < list_window->window.height; i++) {
     hui_go_down_list_window(list_window);
+  }
+}
+
+void hui_push_line_list_window(Hui_List_Window* list_window, Line line) {
+  push_line(&list_window->lines, line);
+  hui_go_down_list_window(list_window);    
+}
+
+void hui_home_list_window(Hui_List_Window* list_window) {
+  list_window->cursor = 0;
+}
+
+void hui_end_list_window(Hui_List_Window* list_window) {
+  if (list_window->lines.count > list_window->window.height) {
+    list_window->cursor = list_window->lines.count - list_window->window.height;
+  } else {
+    list_window->cursor = 0;
   }
 }
 
@@ -145,6 +169,10 @@ int main() {
           hui_page_up_list_window(&list_window);
         } else if (ch == 6) {
           hui_page_down_list_window(&list_window);
+        } else if (ch == 'G') {
+          hui_end_list_window(&list_window);
+        } else if (ch == 'g') {
+          hui_home_list_window(&list_window);
         }
       } 
       
@@ -154,6 +182,7 @@ int main() {
         hui_set_window_size(&window);
         hui_set_window_size(&list_window.window);
       }
+
       if (numberFds > 1) {
         if (fd[1].revents & POLLIN) {
           ssize_t bytes = read(STDIN_FILENO, buffer, MAX_BUFFER_SIZE);
@@ -166,7 +195,7 @@ int main() {
                 strncpy(line.line, buffer2, b2_size);
                 line.line[b2_size] = '\0';
                 b2_size = 0;
-                push_line(&list_window.lines, line);
+                hui_push_line_list_window(&list_window, line);
               } else {
                 if (b2_size >= MAX_BUFFER_SIZE - 1) {
                   Line line = {0};
@@ -175,7 +204,7 @@ int main() {
                   strncpy(line.line, buffer2, b2_size);
                   line.line[b2_size] = '\0';
                   b2_size = 0;
-                  push_line(&list_window.lines, line);
+                  hui_push_line_list_window(&list_window, line);
                 }
                 buffer2[b2_size++] = buffer[i];
               }
