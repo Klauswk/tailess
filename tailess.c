@@ -41,29 +41,40 @@ void push_line(Lines* lines, Line line) {
 #define MAX_BUFFER_SIZE 4096
 
 typedef struct {
- Hui_Window window;
- Lines lines;
- size_t cursor;
+  size_t width;
+  size_t height;
+  size_t x;
+  size_t y;
+  Lines lines;
+  size_t cursor;
 } Hui_List_Window;
 
 Hui_List_Window hui_create_list_window(int width, int height, int y, int x) {
   Hui_Window win = hui_create_window(width, height, y, x);
 
   return (Hui_List_Window) {
-    .window = win,
+    .width = win.width,
+    .height = win.height,
+    .x = win.x,
+    .y = win.y,
   };
 }
 
 
 void hui_draw_list_window(Hui_List_Window list_window) {
-  size_t height = list_window.window.height;
-  size_t x = list_window.window.x;
-  size_t y = list_window.window.y;
-  
+  size_t height = list_window.height;
+  size_t x = list_window.x;
+  size_t y = list_window.y;
+  Hui_Window win = {
+    .width = list_window.width,
+    .height = list_window.height,
+    .x = list_window.x,
+    .y = list_window.y,
+  };
   for (size_t i = 0; i < height; i++) {
     int offset = i + list_window.cursor;
     Line line = list_window.lines.lines[offset];
-    hui_put_text_at_window(list_window.window, line.line, line.count, i + y, x);
+    hui_put_text_at_window(win, line.line, line.count, i + y, x);
   }
 }
 
@@ -79,7 +90,7 @@ void hui_go_up_list_window(Hui_List_Window* list_window) {
 }
 
 void hui_page_up_list_window(Hui_List_Window* list_window) {
-  for (size_t i = 0; i < list_window->window.height; i++) {
+  for (size_t i = 0; i < list_window->height; i++) {
     hui_go_up_list_window(list_window);
   }
 }
@@ -87,17 +98,17 @@ void hui_page_up_list_window(Hui_List_Window* list_window) {
 void hui_go_down_list_window(Hui_List_Window* list_window) {
   size_t n = list_window->lines.count;
   size_t cursor = list_window->cursor;
-  size_t height = list_window->window.height;
+  size_t height = list_window->height;
 
   if (n > height && cursor > n - height) {
-  return ;
+    return ;
   } 
 
   if (n > 0 && cursor < n -1) list_window->cursor++;
 }
 
 void hui_page_down_list_window(Hui_List_Window* list_window) {
-  for (size_t i = 0; i < list_window->window.height; i++) {
+  for (size_t i = 0; i < list_window->height; i++) {
     hui_go_down_list_window(list_window);
   }
 }
@@ -112,8 +123,8 @@ void hui_home_list_window(Hui_List_Window* list_window) {
 }
 
 void hui_end_list_window(Hui_List_Window* list_window) {
-  if (list_window->lines.count > list_window->window.height) {
-    list_window->cursor = list_window->lines.count - list_window->window.height;
+  if (list_window->lines.count > list_window->height) {
+    list_window->cursor = list_window->lines.count - list_window->height;
   } else {
     list_window->cursor = 0;
   }
@@ -180,7 +191,8 @@ int main() {
 
       if (evt == RESIZE) {
         hui_set_window_size(&window);
-        hui_set_window_size(&list_window.window);
+        Hui_Window win = *((Hui_Window *) &list_window);
+        hui_set_window_size(&win);
       }
 
       if (numberFds > 1) {
