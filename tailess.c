@@ -71,7 +71,10 @@ void hui_draw_list_window(Hui_List_Window list_window) {
     .x = list_window.x,
     .y = list_window.y,
   };
-  for (size_t i = 0; i < height; i++) {
+
+  size_t n = list_window.lines.count < height ? list_window.lines.count : height;
+
+  for (size_t i = 0; i < n; i++) {
     int offset = i + list_window.cursor;
     Line line = list_window.lines.lines[offset];
     hui_put_text_at_window(win, line.line, line.count, i + y, x);
@@ -157,15 +160,21 @@ int main() {
   char buffer2[MAX_BUFFER_SIZE];
   size_t b2_size = 0;
   int numberFds = 2;
+  int updated = 1;
 
   Hui_List_Window list_window = hui_create_list_window(window.width, window.height, 0, 0);
 
   while(1) {
+    
+    if (updated) {
+      hui_draw_list_window(list_window);
+      updated = 0;
+    }
+
     int retval = poll(fd, numberFds, 1000);
-    hui_clear_window();
+    
     if (retval == -1) {
       if (errno == EINTR) continue;
-
       return 1;
     } else if (retval) {
       if (fd[0].revents & POLLIN) {
@@ -173,16 +182,22 @@ int main() {
         if (ch == 'q') {
           break;
         } else if (ch == 'j') {
+          updated = 1;
           hui_go_down_list_window(&list_window);
         } else if (ch == 'k') {
+          updated = 1;
           hui_go_up_list_window(&list_window);
         } else if (ch == 2) {
+          updated = 1;
           hui_page_up_list_window(&list_window);
         } else if (ch == 6) {
+          updated = 1;
           hui_page_down_list_window(&list_window);
         } else if (ch == 'G') {
+          updated = 1;
           hui_end_list_window(&list_window);
         } else if (ch == 'g') {
+          updated = 1;
           hui_home_list_window(&list_window);
         }
       } 
@@ -193,6 +208,7 @@ int main() {
         hui_set_window_size(&window);
         Hui_Window win = *((Hui_Window *) &list_window);
         hui_set_window_size(&win);
+        updated = 1;
       }
 
       if (numberFds > 1) {
@@ -208,6 +224,7 @@ int main() {
                 line.line[b2_size] = '\0';
                 b2_size = 0;
                 hui_push_line_list_window(&list_window, line);
+                updated = 1;
               } else {
                 if (b2_size >= MAX_BUFFER_SIZE - 1) {
                   Line line = {0};
@@ -217,6 +234,7 @@ int main() {
                   line.line[b2_size] = '\0';
                   b2_size = 0;
                   hui_push_line_list_window(&list_window, line);
+                  updated = 1;
                 }
                 buffer2[b2_size++] = buffer[i];
               }
@@ -227,7 +245,9 @@ int main() {
         }
       }
     }
-    hui_draw_list_window(list_window);
+    if (updated) {
+      hui_clear_window();
+    }
   }
   hui_free_list_window(list_window);
   kill(getpid(), SIGINT);
