@@ -17,7 +17,7 @@ typedef enum {
   RESIZE,
 } Hui_Event;
 
-typedef struct Hui_Window {
+typedef struct {
   size_t width;
   size_t height;
   size_t x;
@@ -193,8 +193,9 @@ void hui_put_character_at(char c, int y, int x) {
  * We assume 0 based index 
  */
 void hui_put_text_at_window(Hui_Window window, char* c, size_t size, size_t y, size_t x) {
-  int within_y_boundaries = y >= window.y && y < window.y + window.height;
-  int within_x_boundaries = x >= window.x && x < window.x + window.width;
+  int within_y_boundaries = y < window.y + window.height;
+  int within_x_boundaries = x < window.x + window.width;
+
   if (within_x_boundaries && within_y_boundaries) {
     hui_move_cursor_to(window.y + y, window.x + x);
     write(1, c, size);
