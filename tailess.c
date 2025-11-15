@@ -47,6 +47,7 @@ typedef struct {
   size_t y;
   Lines lines;
   size_t cursor;
+  char* needle;
 } Hui_List_Window;
 
 Hui_List_Window hui_create_list_window(int width, int height, int y, int x) {
@@ -57,9 +58,34 @@ Hui_List_Window hui_create_list_window(int width, int height, int y, int x) {
     .height = win.height,
     .x = win.x,
     .y = win.y,
+    .needle = 0, 
   };
 }
 
+typedef struct {
+  char* cstr;
+  size_t size;
+} Sv;
+
+Sv sv_from_cstr(char* cstr, size_t size) {
+  return (Sv) {
+    .cstr = cstr,
+    .size = size,
+  };
+}
+
+Sv sv_chop_by_size(Sv* sv, size_t size) {
+  if (size > sv->size) {
+    size = sv->size;
+  }
+
+  Sv result = sv_from_cstr(sv->cstr, size);
+
+  sv->cstr += size;
+  sv->size -= size;
+
+  return result;
+}
 
 void hui_draw_list_window(Hui_List_Window list_window) {
   size_t height = list_window.height;
@@ -77,7 +103,37 @@ void hui_draw_list_window(Hui_List_Window list_window) {
   for (size_t i = 0; i < n; i++) {
     int offset = i + list_window.cursor;
     Line line = list_window.lines.lines[offset];
-    hui_put_text_at_window(win, line.line, line.count, i + y, x);
+
+    Sv sv_line = sv_from_cstr(line.line, line.count);
+
+    size_t acc = 0; 
+    
+    if (line.count < 1) continue;
+
+    if (list_window.needle) {
+      char* substring = strstr(sv_line.cstr, list_window.needle);
+      while (substring) {
+        size_t substring_size = substring - sv_line.cstr; 
+        Sv sv1 = sv_chop_by_size(&sv_line, substring_size);
+        hui_put_text_at_window(win, sv1.cstr, sv1.size, i + y, x + acc);
+
+        acc = acc + substring_size;
+
+        Sv sv_needle = sv_chop_by_size(&sv_line, strlen(list_window.needle));
+
+        Sv blue_fg = sv_from_cstr("\x1b[34m", 5);
+        hui_put_text_at_window(win, blue_fg.cstr, blue_fg.size, i + y, x + acc); 
+        hui_put_text_at_window(win, sv_needle.cstr, sv_needle.size, i + y, x + acc);
+        Sv reset_fg = sv_from_cstr("\x1b[m", 3);
+        hui_put_text_at_window(win, reset_fg.cstr, reset_fg.size, i + y, x + acc); 
+        acc = acc + sv_needle.size;
+
+        substring = strstr(sv_line.cstr, list_window.needle);
+      }
+
+    }
+
+    hui_put_text_at_window(win, sv_line.cstr, sv_line.size, i + y, x + acc);
   }
 }
 
@@ -118,7 +174,6 @@ void hui_page_down_list_window(Hui_List_Window* list_window) {
 
 void hui_push_line_list_window(Hui_List_Window* list_window, Line line) {
   push_line(&list_window->lines, line);
-  hui_go_down_list_window(list_window);    
 }
 
 void hui_home_list_window(Hui_List_Window* list_window) {
@@ -161,8 +216,9 @@ int main() {
   size_t b2_size = 0;
   int numberFds = 2;
   int updated = 1;
+  char input_buffer = "INFO";
 
-  Hui_List_Window list_window = hui_create_list_window(window.width, window.height, 0, 0);
+  Hui_List_Window list_window = hui_create_list_window(window.width, window.height - 2, 0, 0);
 
   while(1) {
     
