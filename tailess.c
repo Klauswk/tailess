@@ -47,18 +47,22 @@ typedef struct {
   size_t y;
   Lines lines;
   size_t cursor;
-  char* needle;
+  Line needle;
 } Hui_List_Window;
 
 Hui_List_Window hui_create_list_window(int width, int height, int y, int x) {
   Hui_Window win = hui_create_window(width, height, y, x);
+  Line line = {
+    .line = 0,
+    .count = 0,
+  };
 
   return (Hui_List_Window) {
     .width = win.width,
     .height = win.height,
     .x = win.x,
     .y = win.y,
-    .needle = 0, 
+    .needle = line, 
   };
 }
 
@@ -110,8 +114,8 @@ void hui_draw_list_window(Hui_List_Window list_window) {
     
     if (line.count < 1) continue;
 
-    if (list_window.needle) {
-      char* substring = strstr(sv_line.cstr, list_window.needle);
+    if (list_window.needle.line) {
+      char* substring = strstr(sv_line.cstr, list_window.needle.line);
       while (substring) {
         size_t substring_size = substring - sv_line.cstr; 
         Sv sv1 = sv_chop_by_size(&sv_line, substring_size);
@@ -119,7 +123,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
 
         acc = acc + substring_size;
 
-        Sv sv_needle = sv_chop_by_size(&sv_line, strlen(list_window.needle));
+        Sv sv_needle = sv_chop_by_size(&sv_line, strlen(list_window.needle.line));
 
         Sv blue_fg = sv_from_cstr("\x1b[34m", 5);
         hui_put_text_at_window(win, blue_fg.cstr, blue_fg.size, i + y, x + acc); 
@@ -128,7 +132,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
         hui_put_text_at_window(win, reset_fg.cstr, reset_fg.size, i + y, x + acc); 
         acc = acc + sv_needle.size;
 
-        substring = strstr(sv_line.cstr, list_window.needle);
+        substring = strstr(sv_line.cstr, list_window.needle.line);
       }
 
     }
@@ -216,8 +220,10 @@ int hui_input_reserve(Hui_Input* input, size_t expected_capacity) {
       input->buffer = result;
       return 1;
     }
+
+    return 0;
   }
-  return 0;
+  return 1;
 }
 
 Hui_Input hui_create_input_window(int width, int height, int y, int x) {
@@ -234,6 +240,7 @@ Hui_Input hui_create_input_window(int width, int height, int y, int x) {
 
   return input;
 }
+
 /*
  * Return > 0 if char consumed
  */
@@ -255,9 +262,25 @@ int hui_input_accept(Hui_Input* input, char c) {
   return 0;
 }
 
+/*
+ * Return > 0 if char pop 
+ */
+int hui_input_pop_char(Hui_Input* input) {
+  if (input->cursor > 0) {
+    input->cursor--; 
+    return 1;
+  }
+  return 0;
+}
+
 void hui_draw_input_window(Hui_Input input) {
   Hui_Window win = *((Hui_Window *) &input);
-  hui_put_text_at_window(win, "Hi", 2, 0, 0);
+  if (input.input_on) {
+    hui_put_text_at_window(win, "/", 1, 0, 0);
+  };
+  if (input.cursor > 0) {
+    hui_put_text_at_window(win, input.buffer, input.cursor, 0, 1);
+  }
 }
 
 int main() {
@@ -287,10 +310,8 @@ int main() {
   size_t b2_size = 0;
   int numberFds = 2;
   int updated = 1;
-  char* input_buffer = "INFO";
 
   Hui_List_Window list_window = hui_create_list_window(window.width, window.height - 2, 0, 0);
-  list_window.needle = input_buffer;
 
   Hui_Input input_window = hui_create_input_window(window.width, 1, window.height - 1, 0);
 
@@ -310,7 +331,8 @@ int main() {
     } else if (retval) {
       if (fd[0].revents & POLLIN) {
         read(input, &ch, 1);
-        if (input_window.input_on && ch != '\n' &&  hui_input_push_char(&input_window, ch)) {
+        if (input_window.input_on && ch != '\n' && ch != 27 && ch != 127 && hui_input_push_char(&input_window, ch)) {
+          updated = 1;
         } else if (ch == 'q') {
           break;
         } else if (ch == 'j') {
@@ -331,10 +353,36 @@ int main() {
         } else if (ch == 'g') {
           updated = 1;
           hui_home_list_window(&list_window);
-        } else if (ch == ':') {
+        } else if (ch == '/') {
           input_window.input_on = 1;
+          updated = 1;
+        } else if (ch == 27) { 
+          input_window.input_on = 0;
+          input_window.cursor = 0;
+          updated = 1;
         } else if (ch == '\n') {
           input_window.input_on = 0;
+
+          if (list_window.needle.line != 0) {
+            free(list_window.needle.line);
+            list_window.needle.line = 0;
+            list_window.needle.count = 0;
+          }
+
+          if (input_window.cursor > 3) {
+            list_window.needle.line = malloc(sizeof(char) * (input_window.cursor + 1));
+            strncpy(list_window.needle.line, input_window.buffer, input_window.cursor);
+            list_window.needle.line[input_window.cursor] = '\0';
+            list_window.needle.count = input_window.cursor;
+          }
+
+          input_window.cursor = 0;
+          updated = 1;
+        } else if (ch == 127) {
+          if (!hui_input_pop_char(&input_window)) {
+            input_window.input_on = 0;
+          }
+          updated = 1;
         }
       } 
       
