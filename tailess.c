@@ -192,6 +192,42 @@ void hui_end_list_window(Hui_List_Window* list_window) {
   }
 }
 
+int hui_go_to_next_occurrence(Hui_List_Window* list_window) {
+  if (!list_window->needle.line && list_window->needle.count == 0) return 0;
+
+  for (size_t i = list_window->cursor + 1; i < list_window->lines.count; i++) { 
+    if (strstr(list_window->lines.lines[i].line, list_window->needle.line)) {
+     list_window->cursor = i; 
+     return 1;
+    }
+  }
+
+  return 0;
+}
+
+int hui_go_to_previous_occurrence(Hui_List_Window* list_window) {
+  if (!list_window->needle.line && list_window->needle.count == 0) return 0;
+  
+  if (list_window->cursor == 0) {
+    return 0;
+  }
+
+  size_t i = list_window->cursor - 1;
+
+  while (1) {
+    if (strstr(list_window->lines.lines[i].line, list_window->needle.line)) {
+     list_window->cursor = i; 
+     return 1;
+    }
+    
+    // We can't allow it to overflow, but we must include 0
+    if (i == 0) return 0;
+
+    i--;
+  }
+
+  return 0;
+}
 
 int main() {
   int input = STDIN_FILENO; 
@@ -251,6 +287,12 @@ int main() {
         } else if (ch == 'k') {
           updated = 1;
           hui_go_up_list_window(&list_window);
+        } else if (ch == 'N') {
+          hui_go_to_previous_occurrence(&list_window); 
+          updated = 1;
+        } else if (ch == 'n') {
+          hui_go_to_next_occurrence(&list_window); 
+          updated = 1;
         } else if (ch == 2) { // CTRL + B
           updated = 1;
           hui_page_up_list_window(&list_window);
@@ -282,7 +324,7 @@ int main() {
             }
           }
 
-        } else if (ch == '\n') {
+        } else if (ch == '\n') { //ENTER
           input_window.input_on = 0;
 
           if (list_window.needle.line != 0) {
@@ -291,13 +333,14 @@ int main() {
             list_window.needle.count = 0;
           }
 
-          if (input_window.cursor > 3) { // ENTER
+          if (input_window.cursor > 3) { 
             list_window.needle.line = malloc(sizeof(char) * (input_window.cursor + 1));
             strncpy(list_window.needle.line, input_window.buffer, input_window.cursor);
             list_window.needle.line[input_window.cursor] = '\0';
             list_window.needle.count = input_window.cursor;
           }
 
+          hui_go_to_next_occurrence(&list_window); 
           input_window.cursor = 0;
           updated = 1;
         } else if (ch == 127) { //BACKSPACE
