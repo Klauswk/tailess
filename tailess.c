@@ -106,6 +106,9 @@ void hui_draw_list_window(Hui_List_Window list_window) {
 
   for (size_t i = 0; i < n; i++) {
     int offset = i + list_window.cursor;
+
+    if (offset > list_window.lines.count) break;
+
     Line line = list_window.lines.lines[offset];
 
     Sv sv_line = sv_from_cstr(line.line, line.count);
@@ -277,7 +280,47 @@ int main() {
     } else if (retval) {
       if (fd[0].revents & POLLIN) {
         read(input, &ch, 1);
-        if (input_window.input_on && ch != '\n' && ch != 27 && ch != 127 && ch != 23 && hui_input_push_char(&input_window, ch)) {
+
+        if (ch == 27) { // ESC 
+          input_window.input_on = 0;
+          input_window.cursor = 0;
+          updated = 1;
+        } else if (ch == 23) { // CTRL + W
+          if (input_window.input_on && input_window.cursor > 0) {
+            for (int i = input_window.cursor; i > 0; i--) {
+              if (input_window.buffer[i] != ' ') {
+                hui_input_pop_char(&input_window);
+                continue;
+              }
+              break;
+            }
+          }
+          updated = 1;
+        } else if (ch == '\n') { //ENTER
+          input_window.input_on = 0;
+
+          if (list_window.needle.line != 0) {
+            free(list_window.needle.line);
+            list_window.needle.line = 0;
+            list_window.needle.count = 0;
+          }
+
+          if (input_window.cursor > 3) { 
+            list_window.needle.line = malloc(sizeof(char) * (input_window.cursor + 1));
+            strncpy(list_window.needle.line, input_window.buffer, input_window.cursor);
+            list_window.needle.line[input_window.cursor] = '\0';
+            list_window.needle.count = input_window.cursor;
+          }
+
+          hui_go_to_next_occurrence(&list_window); 
+          input_window.cursor = 0;
+          updated = 1;
+        } else if (ch == 127) { //BACKSPACE
+          if (!hui_input_pop_char(&input_window)) {
+            input_window.input_on = 0;
+          }
+          updated = 1;
+        } else if (input_window.input_on && hui_input_push_char(&input_window, ch)) {
           updated = 1;
         } else if (ch == 'q') {
           break;
@@ -307,46 +350,6 @@ int main() {
           hui_home_list_window(&list_window);
         } else if (ch == '/') {
           input_window.input_on = 1;
-          updated = 1;
-        } else if (ch == 27) { // ESC 
-          input_window.input_on = 0;
-          input_window.cursor = 0;
-          updated = 1;
-        } else if (ch == 23) { // CTRL + W
-          if (input_window.input_on && input_window.cursor > 0) {
-            for (int i = input_window.cursor; i > 0; i--) {
-              if (input_window.buffer[i] != ' ') {
-                hui_input_pop_char(&input_window);
-                continue;
-              }
-              updated = 1;
-              break;
-            }
-          }
-
-        } else if (ch == '\n') { //ENTER
-          input_window.input_on = 0;
-
-          if (list_window.needle.line != 0) {
-            free(list_window.needle.line);
-            list_window.needle.line = 0;
-            list_window.needle.count = 0;
-          }
-
-          if (input_window.cursor > 3) { 
-            list_window.needle.line = malloc(sizeof(char) * (input_window.cursor + 1));
-            strncpy(list_window.needle.line, input_window.buffer, input_window.cursor);
-            list_window.needle.line[input_window.cursor] = '\0';
-            list_window.needle.count = input_window.cursor;
-          }
-
-          hui_go_to_next_occurrence(&list_window); 
-          input_window.cursor = 0;
-          updated = 1;
-        } else if (ch == 127) { //BACKSPACE
-          if (!hui_input_pop_char(&input_window)) {
-            input_window.input_on = 0;
-          }
           updated = 1;
         }
       } 
