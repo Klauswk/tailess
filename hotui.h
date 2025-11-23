@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
@@ -33,10 +34,10 @@ void hui_print(char* string);
 void hui_clear_window();
 Hui_Window hui_init();
 void hui_set_window_size(Hui_Window* window);
-Hui_Window hui_create_window(int width, int height, int y, int x);
-void hui_move_cursor_to(int y, int x);
-void hui_put_text_at(char* c, size_t size,int y, int x);
-void hui_put_character_at(char c, int y, int x);
+Hui_Window hui_create_window(uint64_t width, uint64_t height, uint64_t y, uint64_t x);
+void hui_move_cursor_to(uint64_t y, uint64_t x);
+void hui_put_text_at(char* c, size_t size,uint64_t y, uint64_t x);
+void hui_put_character_at(char c, uint64_t y, uint64_t x);
 void hui_put_text_at_window(Hui_Window window, char* c, size_t size, size_t y, size_t x);
 void hui_put_character_at_window(Hui_Window window, char c, size_t y, size_t x);
 void hui_draw_border_at_window(Hui_Window window);
@@ -55,18 +56,18 @@ typedef struct {
   size_t input_on;
 } Hui_Input;
 
-Hui_Input hui_create_input_window(int width, int height, int y, int x);
-int hui_input_reserve(Hui_Input* input, size_t expected_capacity);
+Hui_Input hui_create_input_window(uint64_t width, uint64_t height, uint64_t y, uint64_t x);
+int64_t hui_input_reserve(Hui_Input* input, size_t expected_capacity);
 void hui_draw_input_window(Hui_Input input);
-int hui_input_pop_char(Hui_Input* input);
-int hui_input_accept(Hui_Input* input, char c);
-int hui_input_push_char(Hui_Input* input, char c);
+int64_t hui_input_pop_char(Hui_Input* input);
+int64_t hui_input_accept(Hui_Input* input, char c);
+int64_t hui_input_push_char(Hui_Input* input, char c);
 
 #endif // HOTUI_H_
 
 #ifdef HOTUI_IMPLEMENTATION
 
-static int output_fd;
+static int64_t output_fd;
 static struct termios initial;
 static uint16_t terminal_width;
 static uint16_t terminal_height;
@@ -179,7 +180,7 @@ void hui_set_window_size(Hui_Window* window) {
   window->width = terminal_width;
 }
 
-Hui_Window hui_create_window(int width, int height, int y, int x) {
+Hui_Window hui_create_window(uint64_t width, uint64_t height, uint64_t y, uint64_t x) {
   return (Hui_Window) {
     .width = width,
     .height = height,
@@ -188,19 +189,19 @@ Hui_Window hui_create_window(int width, int height, int y, int x) {
   };
 }
 
-void hui_move_cursor_to(int y, int x) {
+void hui_move_cursor_to(uint64_t y, uint64_t x) {
   y++;
   x++;
   char buffer[50];
   hui_print("\x1b[");   
-  sprintf(buffer, "\x1b[%d;%dH", y, x);
+  sprintf(buffer, "\x1b[%"PRIu64";%"PRIu64"H", y, x);
   hui_print(buffer); 
 }
 
 /*
  * We assume 0 based index 
  */
-void hui_put_text_at(char* c, size_t size,int y, int x) {
+void hui_put_text_at(char* c, size_t size,uint64_t y, uint64_t x) {
   hui_move_cursor_to(y,x);
   write(1, c, size);
 }
@@ -208,7 +209,7 @@ void hui_put_text_at(char* c, size_t size,int y, int x) {
 /*
  * We assume 0 based index 
  */
-void hui_put_character_at(char c, int y, int x) {
+void hui_put_character_at(char c, uint64_t y, uint64_t x) {
   hui_move_cursor_to(y,x);
   write(1, &c, 1);
 }
@@ -253,7 +254,7 @@ void hui_draw_border_at_window(Hui_Window window) {
   }
 }
 
-int hui_input_reserve(Hui_Input* input, size_t expected_capacity) {
+int64_t hui_input_reserve(Hui_Input* input, size_t expected_capacity) {
   size_t capacity = input->capacity;
   if (expected_capacity > capacity) {
     if (capacity == 0) {
@@ -276,7 +277,7 @@ int hui_input_reserve(Hui_Input* input, size_t expected_capacity) {
   return 1;
 }
 
-Hui_Input hui_create_input_window(int width, int height, int y, int x) {
+Hui_Input hui_create_input_window(uint64_t width, uint64_t height, uint64_t y, uint64_t x) {
   Hui_Input input = (Hui_Input) {
     .width = width,
     .height = height,
@@ -294,7 +295,7 @@ Hui_Input hui_create_input_window(int width, int height, int y, int x) {
 /*
  * Return > 0 if char consumed
  */
-int hui_input_push_char(Hui_Input* input, char c) {
+int64_t hui_input_push_char(Hui_Input* input, char c) {
   if (hui_input_reserve(input, input->cursor + 1)) {
     input->buffer[input->cursor++] = c;
     return 1;
@@ -305,7 +306,7 @@ int hui_input_push_char(Hui_Input* input, char c) {
 /**
  * Return > 0 if char consumed
  */
-int hui_input_accept(Hui_Input* input, char c) {
+int64_t hui_input_accept(Hui_Input* input, char c) {
   if (input->input_on) {
      return hui_input_push_char(input, c);
   }
@@ -315,7 +316,7 @@ int hui_input_accept(Hui_Input* input, char c) {
 /*
  * Return > 0 if char pop 
  */
-int hui_input_pop_char(Hui_Input* input) {
+int64_t hui_input_pop_char(Hui_Input* input) {
   if (input->cursor > 0) {
     input->cursor--; 
     return 1;

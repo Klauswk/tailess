@@ -105,7 +105,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
   size_t n = list_window.lines.count < height ? list_window.lines.count : height;
 
   for (size_t i = 0; i < n; i++) {
-    int offset = i + list_window.cursor;
+    uint64_t offset = i + list_window.cursor;
 
     if (offset > list_window.lines.count) break;
 
