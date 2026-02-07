@@ -267,8 +267,10 @@ int main() {
   while(1) {
     
     if (updated) {
+      start_drawing();
       hui_draw_list_window(list_window);
       hui_draw_input_window(input_window);
+      end_drawing();
       updated = 0;
     }
 
@@ -370,20 +372,18 @@ int main() {
             for (int i = 0; i < bytes; i++) {
               if (buffer[i] == '\n') {
                 Line line = {0};
-                line.count = b2_size + 1;
-                line.line = malloc(sizeof(char) * line.count + 1);
+                line.count = b2_size;
+                line.line = malloc(sizeof(char) * line.count);
                 strncpy(line.line, buffer2, b2_size);
-                line.line[b2_size] = '\0';
                 b2_size = 0;
                 hui_push_line_list_window(&list_window, line);
                 updated = 1;
               } else {
                 if (b2_size >= MAX_BUFFER_SIZE - 1) {
                   Line line = {0};
-                  line.count = b2_size + 1;
-                  line.line = malloc(sizeof(char) * line.count + 1);
+                  line.count = b2_size;
+                  line.line = malloc(sizeof(char) * line.count);
                   strncpy(line.line, buffer2, b2_size);
-                  line.line[b2_size] = '\0';
                   b2_size = 0;
                   hui_push_line_list_window(&list_window, line);
                   updated = 1;
