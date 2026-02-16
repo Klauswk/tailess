@@ -253,6 +253,8 @@ void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
     Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
     int ansi_escape = 0;
     size_t skip = 0;
+    uint8_t foreground = 0;
+    uint8_t background = 0;
 
     for (size_t i = 0; i < size; i++) {
       if (c[i] == '\x1b') {
@@ -260,11 +262,13 @@ void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
         skip++;
         continue;
       } else if (ansi_escape || c[i] == 'm') {
-        ansi_escape = 0; 
+        ansi_scape = 0;
         skip++;
         continue;
       }
       screen_buffer->buffer[y*terminal_width + x + i - skip]  = c[i];
+      screen_buffer->foreground[y*terminal_width + x + i - skip]  = foreground;
+      screen_buffer->background[y*terminal_width + x + i - skip]  = background;
     }
   } else {
     hui_move_cursor_to(y,x);
