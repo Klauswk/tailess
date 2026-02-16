@@ -85,6 +85,8 @@ static size_t hui_event_cursor_read_index = 0;
 
 typedef struct {
   char* buffer;
+  uint8_t* foreground;
+  uint8_t* background;
   size_t capacity;
   size_t size;
 } Screen_Buffer;
@@ -123,9 +125,34 @@ static void hui_resize(int i) {
   ioctl(1, TIOCGWINSZ, &ws);
   terminal_width = ws.ws_col;
   terminal_height = ws.ws_row;
-  if (scr_buf[curr_buff].buffer) free(scr_buf[curr_buff].buffer);
-  size_t screen_size = terminal_width * terminal_height * sizeof(char);
-  scr_buf[curr_buff].buffer = malloc(screen_size);
+  if (scr_buf[curr_buff].buffer) {
+    free(scr_buf[curr_buff].buffer);
+    free(scr_buf[curr_buff].foreground);
+    free(scr_buf[curr_buff].background);
+  } else if (scr_buf[!curr_buff].buffer) {
+    free(scr_buf[!curr_buff].buffer);
+    free(scr_buf[!curr_buff].foreground);
+    free(scr_buf[!curr_buff].background);
+  }
+  size_t screen_size = terminal_width * terminal_height;
+  scr_buf[curr_buff].size = screen_size;
+  scr_buf[curr_buff].buffer = malloc(screen_size * sizeof(char));
+  scr_buf[curr_buff].foreground = malloc(screen_size * sizeof(uint8_t));
+  scr_buf[curr_buff].background = malloc(screen_size * sizeof(uint8_t));
+
+  memset(scr_buf[curr_buff].buffer, ' ', screen_size * sizeof(char)); 
+  memset(scr_buf[curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
+  memset(scr_buf[curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+
+  scr_buf[!curr_buff].size = screen_size;
+  scr_buf[!curr_buff].buffer = malloc(screen_size * sizeof(char));
+  scr_buf[!curr_buff].foreground = malloc(screen_size * sizeof(uint8_t));
+  scr_buf[!curr_buff].background = malloc(screen_size * sizeof(uint8_t));
+
+  memset(scr_buf[!curr_buff].buffer, ' ', screen_size * sizeof(char)); 
+  memset(scr_buf[!curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
+  memset(scr_buf[!curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+
   push_event(RESIZE);
 }
 
@@ -364,13 +391,17 @@ int64_t hui_use_retain_mode() {
 
 void start_drawing() {
   Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
-  size_t screen_size = terminal_width * terminal_height * sizeof(char);
+  size_t screen_size = terminal_width * terminal_height;
   screen_buffer->size = screen_size;
   if (!screen_buffer->buffer) {
-    screen_buffer->buffer = malloc(screen_size);
+    screen_buffer->buffer = malloc(screen_size * sizeof(char));
+    screen_buffer->foreground = malloc(screen_size * sizeof(uint8_t));
+    screen_buffer->background = malloc(screen_size * sizeof(uint8_t));
   }
 
-  memset(screen_buffer->buffer, ' ', screen_size); 
+  memset(screen_buffer->buffer, ' ', screen_size * sizeof(char)); 
+  memset(screen_buffer->foreground, 0, screen_size * sizeof(uint8_t)); 
+  memset(screen_buffer->background, 0, screen_size * sizeof(uint8_t)); 
 }
 
 void end_drawing() {
