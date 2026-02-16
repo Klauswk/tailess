@@ -251,7 +251,21 @@ void hui_move_cursor_to(uint64_t y, uint64_t x) {
 void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
   if (buffering) {
     Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
-    for (size_t i = 0; i < size; i++) screen_buffer->buffer[y*terminal_width + x + i]  = c[i];
+    int ansi_escape = 0;
+    size_t skip = 0;
+
+    for (size_t i = 0; i < size; i++) {
+      if (c[i] == '\x1b') {
+        ansi_escape = 1;
+        skip++;
+        continue;
+      } else if (ansi_escape || c[i] == 'm') {
+        ansi_escape = 0; 
+        skip++;
+        continue;
+      }
+      screen_buffer->buffer[y*terminal_width + x + i - skip]  = c[i];
+    }
   } else {
     hui_move_cursor_to(y,x);
     write(output_fd, c, size);
