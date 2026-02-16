@@ -42,6 +42,8 @@ void hui_put_character_at(char c, uint64_t y, uint64_t x);
 void hui_put_text_at_window(Hui_Window window, char* c, size_t size, size_t y, size_t x);
 void hui_put_character_at_window(Hui_Window window, char c, size_t y, size_t x);
 //Retain mode
+// Return 1 if it was already active;
+int64_t use_retain_mode();
 void start_drawing();
 void end_drawing();
 
@@ -81,12 +83,15 @@ static Hui_Event hui_event_queue[EVENT_QUEUE_SIZE];
 static size_t hui_event_cursor_write_index = 0;
 static size_t hui_event_cursor_read_index = 0;
 
-static struct {
+typedef struct {
   char* buffer;
   size_t capacity;
   size_t size;
-  uint8_t buffering;
-} screen_buffer = {0};
+} Screen_Buffer;
+
+static Screen_Buffer scr_buf[2] = {0};
+int curr_buff = 0;
+int64_t buffering = 0;
 
 void push_event(Hui_Event event) {
   if (hui_event_cursor_write_index >= EVENT_QUEUE_SIZE) {
@@ -118,6 +123,9 @@ static void hui_resize(int i) {
   ioctl(1, TIOCGWINSZ, &ws);
   terminal_width = ws.ws_col;
   terminal_height = ws.ws_row;
+  if (scr_buf[curr_buff].buffer) free(scr_buf[curr_buff].buffer);
+  size_t screen_size = terminal_width * terminal_height * sizeof(char);
+  scr_buf[curr_buff].buffer = malloc(screen_size);
   push_event(RESIZE);
 }
 
@@ -130,8 +138,10 @@ void hui_print(char* string) {
 }
 
 void hui_clear_window() {
-  char* clean_buffer = "\x1b[2J";
-  hui_print(clean_buffer);
+  if (!buffering) {
+    char* clean_buffer = "\x1b[2J";
+    hui_print(clean_buffer);
+  }
 }
 
 static void hui_restore() {
@@ -211,16 +221,10 @@ void hui_move_cursor_to(uint64_t y, uint64_t x) {
 /*
  * We assume 0 based index 
  */
-void hui_put_text_at(char* c, size_t size,uint64_t y, uint64_t x) {
-  if (screen_buffer.buffering) {
-    y++;
-    x++;
-    char buffer[50];
-    size_t sprintf_result = sprintf(buffer, "\x1b[%"PRIu64";%"PRIu64"H", y, x);
-    hui_append_to(&screen_buffer.buffer, &screen_buffer.capacity, &screen_buffer.size, buffer, sprintf_result);
-
-    hui_reserve(&screen_buffer.buffer, &screen_buffer.capacity, screen_buffer.size + size);
-    hui_append_to(&screen_buffer.buffer, &screen_buffer.capacity, &screen_buffer.size, c, size);
+void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
+  if (buffering) {
+    Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
+    for (size_t i = 0; i < size; i++) screen_buffer->buffer[y*terminal_width + x + i]  = c[i];
   } else {
     hui_move_cursor_to(y,x);
     write(output_fd, c, size);
@@ -231,15 +235,9 @@ void hui_put_text_at(char* c, size_t size,uint64_t y, uint64_t x) {
  * We assume 0 based index 
  */
 void hui_put_character_at(char c, uint64_t y, uint64_t x) {
-  if (screen_buffer.buffering) {
-    y++;
-    x++;
-    char buffer[50];
-    size_t size = sprintf(buffer, "\x1b[%"PRIu64";%"PRIu64"H", y, x);
-    hui_append_to(&screen_buffer.buffer, &screen_buffer.capacity, &screen_buffer.size, buffer, size);
-
-    hui_reserve(&screen_buffer.buffer, &screen_buffer.capacity, screen_buffer.size + 1);
-    screen_buffer.buffer[screen_buffer.size++] = c;
+  if (buffering) {
+    Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
+    screen_buffer->buffer[y*terminal_width + x]  = c;
   } else {
     hui_move_cursor_to(y,x);
     write(output_fd, &c, 1);
@@ -301,8 +299,6 @@ int64_t hui_append_to(char** buffer, size_t* capacity, size_t* size, const char*
   return 0;
 }
 
-
-
 Hui_Input hui_create_input_window(uint64_t width, uint64_t height, uint64_t y, uint64_t x) {
   Hui_Input input = (Hui_Input) {
     .width = width,
@@ -360,18 +356,43 @@ void hui_draw_input_window(Hui_Input input) {
   }
 }
 
+int64_t hui_use_retain_mode() {
+  int64_t result = buffering;
+  buffering = 1;
+  return result;
+}
+
 void start_drawing() {
-  screen_buffer.buffering = 1;
-  screen_buffer.size = 0;
+  Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
   size_t screen_size = terminal_width * terminal_height * sizeof(char);
-  
-  hui_reserve(&screen_buffer.buffer, &screen_buffer.capacity, screen_size);
+  screen_buffer->size = screen_size;
+  if (!screen_buffer->buffer) {
+    screen_buffer->buffer = malloc(screen_size);
+  }
+
+  memset(screen_buffer->buffer, ' ', screen_size); 
 }
 
 void end_drawing() {
-  screen_buffer.buffering = 0;
-  write(output_fd, screen_buffer.buffer, screen_buffer.size);
-  screen_buffer.size = 0;
+  Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
+
+  if (scr_buf[curr_buff].size != scr_buf[!curr_buff].size) {
+    write(output_fd, screen_buffer->buffer, screen_buffer->size);
+  } else {
+    for (size_t row = 0; row < terminal_width; row++) {
+      for (size_t col = 0; col < terminal_height; col++) {
+        char c1 = screen_buffer->buffer[row * terminal_width + col];
+        char c2 = scr_buf[!curr_buff].buffer[row * terminal_width + col];
+
+        if (c2 != c1) {
+          hui_put_character_at(row, col, c1);
+        }
+      }
+    }
+  }
+
+  screen_buffer->size = 0;
+  curr_buff = !curr_buff;
 }
 
 #endif // HOTUI_IMPLEMENTATION

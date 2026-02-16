@@ -263,6 +263,8 @@ int main() {
   Hui_List_Window list_window = hui_create_list_window(window.width, window.height - 2, 0, 0);
 
   Hui_Input input_window = hui_create_input_window(window.width, 1, window.height - 1, 0);
+  
+  hui_use_retain_mode();
 
   while(1) {
     
@@ -378,6 +380,8 @@ int main() {
                 b2_size = 0;
                 hui_push_line_list_window(&list_window, line);
                 updated = 1;
+              } else if (buffer[i] == '\t' || buffer[i] == '\r') {
+                buffer2[b2_size++] = ' ';
               } else {
                 if (b2_size >= MAX_BUFFER_SIZE - 1) {
                   Line line = {0};
