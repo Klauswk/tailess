@@ -119,6 +119,30 @@ Hui_Event hui_poll_event() {
   return hui_event_queue[hui_event_cursor_read_index++];
 }
 
+static void init_double_buffering()
+{
+  if (buffering) {
+    size_t screen_size = terminal_width * terminal_height;
+    scr_buf[curr_buff].size = screen_size;
+    scr_buf[curr_buff].buffer = malloc(screen_size * sizeof(char));
+    scr_buf[curr_buff].foreground = malloc(screen_size * sizeof(uint8_t));
+    scr_buf[curr_buff].background = malloc(screen_size * sizeof(uint8_t));
+
+    memset(scr_buf[curr_buff].buffer, ' ', screen_size * sizeof(char)); 
+    memset(scr_buf[curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
+    memset(scr_buf[curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+
+    scr_buf[!curr_buff].size = screen_size;
+    scr_buf[!curr_buff].buffer = malloc(screen_size * sizeof(char));
+    scr_buf[!curr_buff].foreground = malloc(screen_size * sizeof(uint8_t));
+    scr_buf[!curr_buff].background = malloc(screen_size * sizeof(uint8_t));
+
+    memset(scr_buf[!curr_buff].buffer, ' ', screen_size * sizeof(char)); 
+    memset(scr_buf[!curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
+    memset(scr_buf[!curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+  }
+}
+
 static void hui_resize(int i) {
   (void)i;
   struct winsize ws;
@@ -134,27 +158,12 @@ static void hui_resize(int i) {
     free(scr_buf[!curr_buff].foreground);
     free(scr_buf[!curr_buff].background);
   }
-  size_t screen_size = terminal_width * terminal_height;
-  scr_buf[curr_buff].size = screen_size;
-  scr_buf[curr_buff].buffer = malloc(screen_size * sizeof(char));
-  scr_buf[curr_buff].foreground = malloc(screen_size * sizeof(uint8_t));
-  scr_buf[curr_buff].background = malloc(screen_size * sizeof(uint8_t));
 
-  memset(scr_buf[curr_buff].buffer, ' ', screen_size * sizeof(char)); 
-  memset(scr_buf[curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
-  memset(scr_buf[curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
-
-  scr_buf[!curr_buff].size = screen_size;
-  scr_buf[!curr_buff].buffer = malloc(screen_size * sizeof(char));
-  scr_buf[!curr_buff].foreground = malloc(screen_size * sizeof(uint8_t));
-  scr_buf[!curr_buff].background = malloc(screen_size * sizeof(uint8_t));
-
-  memset(scr_buf[!curr_buff].buffer, ' ', screen_size * sizeof(char)); 
-  memset(scr_buf[!curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
-  memset(scr_buf[!curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+  init_double_buffering();
 
   push_event(RESIZE);
 }
+
 
 void hui_print_sz(char* string, size_t size) {
  write(output_fd, string, size); 
@@ -404,6 +413,8 @@ void hui_draw_input_window(Hui_Input input) {
 int64_t hui_use_retain_mode() {
   int64_t result = buffering;
   buffering = 1;
+  init_double_buffering();
+
   return result;
 }
 
@@ -428,19 +439,20 @@ void end_drawing() {
   if (scr_buf[curr_buff].size != scr_buf[!curr_buff].size) {
     write(output_fd, screen_buffer->buffer, screen_buffer->size);
   } else {
-    for (size_t row = 0; row < terminal_width; row++) {
-      for (size_t col = 0; col < terminal_height; col++) {
+    buffering = 0;
+    for (size_t row = 0; row < terminal_height; row++) {
+      for (size_t col = 0; col < terminal_width; col++) {
         char c1 = screen_buffer->buffer[row * terminal_width + col];
         char c2 = scr_buf[!curr_buff].buffer[row * terminal_width + col];
 
         if (c2 != c1) {
-          hui_put_character_at(row, col, c1);
+          hui_put_character_at(c1, row, col);
         }
       }
     }
+    buffering = 1;
   }
 
-  screen_buffer->size = 0;
   curr_buff = !curr_buff;
 }
 
