@@ -262,7 +262,7 @@ void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
         skip++;
         continue;
       } else if (ansi_escape || c[i] == 'm') {
-        ansi_scape = 0;
+        ansi_escape = 0;
         skip++;
         continue;
       }
