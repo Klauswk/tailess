@@ -286,11 +286,11 @@ int main() {
         read(input, &ch, 1);
 
         if (ch == 27) { // ESC 
-          input_window.input_on = 0;
+          input_window.focus = 0;
           input_window.cursor = 0;
           updated = 1;
         } else if (ch == 23) { // CTRL + W
-          if (input_window.input_on && input_window.cursor > 0) {
+          if (input_window.focus && input_window.cursor > 0) {
             for (int i = input_window.cursor; i > 0; i--) {
               if (input_window.buffer[i] != ' ') {
                 hui_input_pop_char(&input_window);
@@ -301,7 +301,7 @@ int main() {
           }
           updated = 1;
         } else if (ch == '\n') { //ENTER
-          input_window.input_on = 0;
+          input_window.focus = 0;
 
           if (list_window.needle.line != 0) {
             free(list_window.needle.line);
@@ -321,10 +321,10 @@ int main() {
           updated = 1;
         } else if (ch == 127) { //BACKSPACE
           if (!hui_input_pop_char(&input_window)) {
-            input_window.input_on = 0;
+            input_window.focus = 0;
           }
           updated = 1;
-        } else if (input_window.input_on && hui_input_push_char(&input_window, ch)) {
+        } else if (input_window.focus && hui_input_push_char(&input_window, ch)) {
           updated = 1;
         } else if (ch == 'q') {
           break;
@@ -353,7 +353,7 @@ int main() {
           updated = 1;
           hui_home_list_window(&list_window);
         } else if (ch == '/') {
-          input_window.input_on = 1;
+          input_window.focus = 1;
           updated = 1;
         }
       } 
@@ -362,8 +362,15 @@ int main() {
 
       if (evt == RESIZE) {
         hui_set_window_size(&window);
-        Hui_Window win = *((Hui_Window *) &list_window);
-        hui_set_window_size(&win);
+        list_window.height = window.height - 2;
+        list_window.width = window.width;
+        list_window.x = 0;
+        list_window.y = 0;
+
+        input_window.width = window.width;
+        input_window.height = 1;
+        input_window.y = window.height - 1;
+        input_window.x = 0;
         updated = 1;
       }
 
