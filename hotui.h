@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <assert.h>
+#include <errno.h>
 
 // ----------------------------------------------------
 // Hui_Window
@@ -253,22 +254,48 @@ void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
     Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
     int ansi_escape = 0;
     size_t skip = 0;
-    uint8_t foreground = 0;
-    uint8_t background = 0;
-
+    //This info needs to be statefull, since the consumer might send a control in one line
+    //And the data in another, we would lose the "context" in this case
+    static uint8_t foreground = 39;
+    static uint8_t background = 49;
+    char* start_chunk = 0;
+    char* end_chunk = 0;
+    
     for (size_t i = 0; i < size; i++) {
-      if (c[i] == '\x1b') {
+      if (c[i] == '\x1b' && c[i+1] == '[') {
         ansi_escape = 1;
-        skip++;
+        skip=+2;
+        start_chunk = &c[i+2];
+        i++;
         continue;
       } else if (ansi_escape && c[i] == 'm') {
         ansi_escape = 0;
         skip++;
+        end_chunk = &c[i-1];
+        
+        long escape_value = strtol(start_chunk, &end_chunk, 0);
+        
+        //A problem happened when trying to process the escape code
+        if (escape_value == 0 && errno) {
+         assert(0 && "Error processing the escape code");
+        } else if (escape_value == 0) {
+          foreground = 39; 
+          background = 49;
+        } else if (escape_value) {
+          if (escape_value > 29 && escape_value < 40) foreground = (uint8_t) escape_value;
+          if (escape_value > 39 && escape_value < 50) background = (uint8_t) escape_value;
+        } 
+        
+        continue;
+      } else if (ansi_escape) {
+        skip++;
         continue;
       }
-      screen_buffer->buffer[y*terminal_width + x + i - skip]  = c[i];
-      screen_buffer->foreground[y*terminal_width + x + i - skip]  = foreground;
-      screen_buffer->background[y*terminal_width + x + i - skip]  = background;
+      size_t offset = y*terminal_width + x + i - skip;
+
+      screen_buffer->buffer[offset]      = c[i];
+      screen_buffer->foreground[offset]  = foreground;
+      screen_buffer->background[offset]  = background;
     }
   } else {
     hui_move_cursor_to(y,x);
@@ -411,8 +438,8 @@ static void init_double_buffering()
     scr_buf[curr_buff].background = malloc(screen_size * sizeof(uint8_t));
 
     memset(scr_buf[curr_buff].buffer, ' ', screen_size * sizeof(char)); 
-    memset(scr_buf[curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
-    memset(scr_buf[curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+    memset(scr_buf[curr_buff].foreground, 39, screen_size * sizeof(uint8_t)); 
+    memset(scr_buf[curr_buff].background, 49, screen_size * sizeof(uint8_t)); 
 
     scr_buf[!curr_buff].size = screen_size;
     scr_buf[!curr_buff].buffer = malloc(screen_size * sizeof(char));
@@ -420,8 +447,8 @@ static void init_double_buffering()
     scr_buf[!curr_buff].background = malloc(screen_size * sizeof(uint8_t));
 
     memset(scr_buf[!curr_buff].buffer, ' ', screen_size * sizeof(char)); 
-    memset(scr_buf[!curr_buff].foreground, 0, screen_size * sizeof(uint8_t)); 
-    memset(scr_buf[!curr_buff].background, 0, screen_size * sizeof(uint8_t)); 
+    memset(scr_buf[!curr_buff].foreground, 39, screen_size * sizeof(uint8_t)); 
+    memset(scr_buf[!curr_buff].background, 49, screen_size * sizeof(uint8_t)); 
   }
 }
 
@@ -444,8 +471,8 @@ void start_drawing() {
   }
 
   memset(screen_buffer->buffer, ' ', screen_size * sizeof(char)); 
-  memset(screen_buffer->foreground, 0, screen_size * sizeof(uint8_t)); 
-  memset(screen_buffer->background, 0, screen_size * sizeof(uint8_t)); 
+  memset(screen_buffer->foreground, 39, screen_size * sizeof(uint8_t)); 
+  memset(screen_buffer->background, 49, screen_size * sizeof(uint8_t)); 
 }
 
 static struct {
@@ -455,7 +482,11 @@ static struct {
 } patches_buffer = {0};
 
 void end_drawing() {
+  //Latest display, the one about to be draw
   Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
+
+  //The last frame buffer, the one that was draw before
+  Screen_Buffer back_buffer = scr_buf[!curr_buff];
   patches_buffer.size = 0;
 
   if (scr_buf[curr_buff].size != scr_buf[!curr_buff].size) {
@@ -463,12 +494,19 @@ void end_drawing() {
   } else {
     for (size_t row = 0; row < terminal_height; row++) {
       for (size_t col = 0; col < terminal_width; col++) {
-        char c1 = screen_buffer->buffer[row * terminal_width + col];
-        char c2 = scr_buf[!curr_buff].buffer[row * terminal_width + col];
+        size_t offset = row * terminal_width + col;
+        char c1 = screen_buffer->buffer[offset];
+        char c2 = back_buffer.buffer[offset];
 
-        if (c2 != c1) {
+        uint8_t fg1 = screen_buffer->foreground[offset];
+        uint8_t fg2 = back_buffer.foreground[offset];
+
+        uint8_t bg1 = screen_buffer->background[offset];
+        uint8_t bg2 = back_buffer.background[offset];
+
+        if (c2 != c1 || fg1 != fg2 || bg1 != bg2) {
           char internal_buffer[50];
-          int n = sprintf(internal_buffer, "\x1b[%"PRIu64";%"PRIu64"H%c", row+1, col+1, c1);
+          int n = sprintf(internal_buffer, "\x1b[%"PRIu64";%"PRIu64"H\x1b[%d;%dm%c", row+1, col+1, fg1, bg1, c1);
           hui_append_to(&patches_buffer.content, &patches_buffer.capacity, &patches_buffer.size, internal_buffer, n);
         }
       }
