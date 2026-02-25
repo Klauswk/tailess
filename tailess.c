@@ -235,8 +235,6 @@ int hui_go_to_previous_occurrence(Hui_List_Window* list_window) {
 int main() {
   int input = STDIN_FILENO; 
 
-  Hui_Window window = hui_init();
-
   if (!isatty(fileno(stdin))) {
     int fd = open("/dev/tty", O_RDONLY | O_CLOEXEC);
 
@@ -245,7 +243,13 @@ int main() {
       return 1;
     }
     input = fd;
+  } else {
+    fprintf(stderr, "You must redirect some info to the application\n");
+    return 1;
   }
+
+  Hui_Window window = hui_init();
+
 
   struct pollfd fd[2];
   fd[0].fd = input;
