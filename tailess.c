@@ -232,17 +232,31 @@ int hui_go_to_previous_occurrence(Hui_List_Window* list_window) {
   return 0;
 }
 
-int main() {
-  int input = STDIN_FILENO; 
+int main(int argc, char** args) {
+  struct pollfd fd[2];
+  fd[0].fd = STDIN_FILENO;
+  fd[0].events = POLLIN;
 
+  fd[1].fd = STDIN_FILENO;
+  fd[1].events = POLLIN;
+   
   if (!isatty(fileno(stdin))) {
-    int fd = open("/dev/tty", O_RDONLY | O_CLOEXEC);
+    int input = open("/dev/tty", O_RDONLY | O_CLOEXEC);
 
-    if (!fd) {
-      printf("Error opening tty\n");
+    if (!input) {
+      fprintf(stderr, "Error opening tty input: %s \n", strerror(errno));
       return 1;
     }
-    input = fd;
+    fd[0].fd = input;
+  } else if (argc > 1) {
+    FILE* fileinput = fopen(args[1], "r");
+
+    if (!fileinput) {
+      fprintf(stderr, "Error opening %s: %s \n", args[1], strerror(errno));
+      return 1;
+    }
+
+    fd[1].fd = fileno(fileinput);
   } else {
     fprintf(stderr, "You must redirect some info to the application\n");
     return 1;
@@ -250,13 +264,6 @@ int main() {
 
   Hui_Window window = hui_init();
 
-
-  struct pollfd fd[2];
-  fd[0].fd = input;
-  fd[0].events = POLLIN;
-
-  fd[1].fd = STDIN_FILENO;
-  fd[1].events = POLLIN;
   char ch;
   char buffer[MAX_BUFFER_SIZE];
   char buffer2[MAX_BUFFER_SIZE];
@@ -287,7 +294,7 @@ int main() {
       return 1;
     } else if (retval) {
       if (fd[0].revents & POLLIN) {
-        read(input, &ch, 1);
+        read(fd[0].fd, &ch, 1);
 
         if (ch == 27) { // ESC 
           input_window.focus = 0;
@@ -380,7 +387,7 @@ int main() {
 
       if (numberFds > 1) {
         if (fd[1].revents & POLLIN) {
-          ssize_t bytes = read(STDIN_FILENO, buffer, MAX_BUFFER_SIZE);
+          ssize_t bytes = read(fd[1].fd, buffer, MAX_BUFFER_SIZE);
           if (bytes > 0) {
             for (int i = 0; i < bytes; i++) {
               if (buffer[i] == '\n') {
