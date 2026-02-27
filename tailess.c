@@ -34,6 +34,8 @@ void line_reserve(Lines* lines, size_t expected_capacity) {
 }
 
 void push_line(Lines* lines, Line line) {
+  assert(line.count < 4096 && "Something went wrong here");
+  assert(line.line && "Line can't be empty");
   line_reserve(lines, lines->count + 1);
   lines->lines[lines->count++] = line;
 }
@@ -140,7 +142,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
 
     }
 
-    hui_put_text_at_window(win, sv_line.cstr, sv_line.size, i + y, x + acc);
+    if (sv_line.cstr) hui_put_text_at_window(win, sv_line.cstr, sv_line.size, i + y, x + acc);
   }
 }
 
@@ -165,6 +167,8 @@ void hui_go_down_list_window(Hui_List_Window* list_window) {
   size_t n = list_window->lines.count;
   size_t cursor = list_window->cursor;
   size_t height = list_window->height;
+
+  if (n < height) return;
 
   if (n > height && cursor > n - height) {
     return ;

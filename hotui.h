@@ -213,6 +213,9 @@ Hui_Window hui_init() {
 
   char* hide_cursor = "\x1b[?25l";
   hui_print(hide_cursor);
+  
+  char* move_cursor_to_top = "\x1b[H";
+  hui_print(move_cursor_to_top);
 
   Hui_Window window = {
     .width = terminal_width,
@@ -287,6 +290,12 @@ void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
         } 
         
         continue;
+      } 
+      //Screen modes, we don't really care
+      else if (ansi_escape && c[i] == 'h') {
+        ansi_escape = 0;
+        skip++;
+        end_chunk = &c[i-1];
       } else if (ansi_escape) {
         skip++;
         continue;
@@ -420,6 +429,10 @@ int64_t hui_input_pop_char(Hui_Input* input) {
 
 void hui_draw_input_window(Hui_Input input) {
   Hui_Window win = *((Hui_Window *) &input);
+  char buffer[256] = {0};
+  sprintf(buffer, "\x1b[%"PRIu64";%"PRIu64"H", input.y, input.x);
+  hui_print(buffer);
+  hui_print("\x1b[?25h");
   if (input.focus) {
     hui_put_text_at_window(win, "/", 1, 0, 0);
   };
