@@ -413,8 +413,11 @@ int main(int argc, char** args) {
                 buffer2[b2_size++] = buffer[i];
               }
             }
+          } else if (bytes == 0) {
+            //Something is weird, we got a POLLIN event but there was nothing to read??
+            numberFds--;
           }
-        } else if (fd[1].revents & POLLHUP) {
+        } else if (fd[1].revents & POLLERR || fd[1].revents & POLLNVAL|| fd[1].revents & POLLHUP) {
           numberFds--;    
         }
       }
