@@ -474,6 +474,8 @@ int64_t hui_use_retain_mode() {
 }
 
 void start_drawing() {
+  if (!buffering) return;
+
   Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
   size_t screen_size = terminal_width * terminal_height;
   screen_buffer->size = screen_size;
@@ -495,6 +497,7 @@ static struct {
 } patches_buffer = {0};
 
 void end_drawing() {
+  if (!buffering) return;
   //Latest display, the one about to be draw
   Screen_Buffer* screen_buffer = &scr_buf[curr_buff];
 
