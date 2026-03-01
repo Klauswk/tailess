@@ -184,20 +184,27 @@ void hui_page_down_list_window(Hui_List_Window* list_window) {
   }
 }
 
-void hui_push_line_list_window(Hui_List_Window* list_window, Line line) {
-  push_line(&list_window->lines, line);
-}
-
-void hui_home_list_window(Hui_List_Window* list_window) {
-  list_window->cursor = 0;
-}
-
 void hui_end_list_window(Hui_List_Window* list_window) {
   if (list_window->lines.count > list_window->height) {
     list_window->cursor = list_window->lines.count - list_window->height;
   } else {
     list_window->cursor = 0;
   }
+}
+
+void hui_push_line_list_window(Hui_List_Window* list_window, Line line) {
+  push_line(&list_window->lines, line);
+  
+  size_t n = list_window->lines.count;
+
+  if (n > list_window->height && list_window->following) hui_end_list_window(list_window);
+;
+
+ 
+}
+
+void hui_home_list_window(Hui_List_Window* list_window) {
+  list_window->cursor = 0;
 }
 
 int hui_go_to_next_occurrence(Hui_List_Window* list_window) {
@@ -365,27 +372,35 @@ uint8_t handle_input(Tailess_Context* context) {
       return 2;
     } else if (ch == 'j') {
       updated = 1;
+      context->list_window.following = 0;
       hui_go_down_list_window(&context->list_window);
     } else if (ch == 'k') {
       updated = 1;
+      context->list_window.following = 0;
       hui_go_up_list_window(&context->list_window);
     } else if (ch == 'N') {
       hui_go_to_previous_occurrence(&context->list_window);
+      context->list_window.following = 0;
       updated = 1;
     } else if (ch == 'n') {
       hui_go_to_next_occurrence(&context->list_window);
+      context->list_window.following = 0;
       updated = 1;
     } else if (ch == 2) { // CTRL + B
       updated = 1;
+      context->list_window.following = 0;
       hui_page_up_list_window(&context->list_window);
     } else if (ch == 6) { // CTRL + F
       updated = 1;
+      context->list_window.following = 0;
       hui_page_down_list_window(&context->list_window);
     } else if (ch == 'G') {
       updated = 1;
+      context->list_window.following = 0;
       hui_end_list_window(&context->list_window);
     } else if (ch == 'g') {
       updated = 1;
+      context->list_window.following = 0;
       hui_home_list_window(&context->list_window);
     } else if (ch == '/') {
       context->input_window.focus = 1;
@@ -441,7 +456,7 @@ int main(int argc, char** args) {
 
   context.message_window = hui_create_window(context.window.width, 1, context.window.height - 2, 0);
 
-  hui_use_retain_mode();
+  //hui_use_retain_mode();
 
   while(1) {
 
