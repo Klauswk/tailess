@@ -450,6 +450,20 @@ int main(int argc, char** args) {
   context.fd[1].fd = STDIN_FILENO;
   context.fd[1].events = POLLIN;
   context.numberFds = 2;
+  uint8_t follow = 0;
+  char* file_name = NULL;
+  
+  // First is the program name, we don't care about it
+  argc--;
+  args++;
+
+  for (int i = 0; i < argc; i++) {
+    if (strcmp(args[i], "-f") == 0) {
+      follow = 1;
+    } else {
+      file_name = args[i];
+    }
+  }
 
   if (!isatty(fileno(stdin))) {
     int input = open("/dev/tty", O_RDONLY | O_CLOEXEC);
@@ -459,14 +473,12 @@ int main(int argc, char** args) {
       return 1;
     }
     context.fd[0].fd = input;
-  } else if (argc > 1) {
-    FILE* fileinput = fopen(args[1], "r");
-
+  } else if (file_name) {
+    FILE* fileinput = fopen(file_name, "r");
     if (!fileinput) {
-      fprintf(stderr, "Error opening %s: %s \n", args[1], strerror(errno));
+      fprintf(stderr, "Error opening %s: %s \n", file_name, strerror(errno));
       return 1;
     }
-
     context.fd[1].fd = fileno(fileinput);
   } else {
     fprintf(stderr, "You must redirect some info to the application\n");
@@ -478,12 +490,9 @@ int main(int argc, char** args) {
   int updated = 1;
 
   context.list_window = hui_create_list_window(context.window.width, context.window.height - 2, 0, 0);
-
-
   context.input_window = hui_create_input_window(context.window.width, 1, context.window.height - 1, 0);
-
   context.message_window = hui_create_window(context.window.width, 1, context.window.height - 2, 0);
-
+  context.list_window.following = follow;
   //hui_use_retain_mode();
 
   while(1) {
