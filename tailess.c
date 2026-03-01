@@ -124,11 +124,8 @@ void hui_draw_list_window(Hui_List_Window list_window) {
     if (offset_x > line.count) {
       sv_line = sv_from_cstr("", 0);
     } else {
-      if (line.count > list_window.width) {
-        sv_line = sv_from_cstr(line.line + offset_x, list_window.width);
-      } else {
-        sv_line = sv_from_cstr(line.line + offset_x, line.count - offset_x);
-      }
+      uint64_t real_offset = line.count - offset_x > list_window.width ? list_window.width : line.count - offset_x;
+      sv_line = sv_from_cstr(line.line + offset_x, real_offset);
     }
 
     size_t acc = 0;
