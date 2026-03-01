@@ -99,6 +99,19 @@ Sv sv_chop_by_size(Sv* sv, size_t size) {
   return result;
 }
 
+char *sv_strstr(Sv haystack, Sv needle) {
+    if (!needle.cstr) return (char *)haystack.cstr; // If needle is empty, return haystack
+
+    for (size_t i = 0; i <= haystack.size - needle.size; i++) {
+        size_t j;
+        for (j = 0; j < needle.size; j++) {
+            if (haystack.cstr[i + j] != needle.cstr[j]) break;
+        }
+        if (j == needle.size) return (char *)&haystack.cstr[i];
+    }
+    return NULL; // needle not found
+}
+
 void hui_draw_list_window(Hui_List_Window list_window) {
   size_t height = list_window.height;
   size_t x = list_window.x;
@@ -130,10 +143,12 @@ void hui_draw_list_window(Hui_List_Window list_window) {
 
     size_t acc = 0;
 
-    if (line.count < 1) continue;
+    if (!line.count) continue;
 
     if (list_window.needle.line) {
-      char* substring = strstr(sv_line.cstr, list_window.needle.line);
+      Sv needle = sv_from_cstr(list_window.needle.line, strlen(list_window.needle.line));
+
+      char* substring = sv_strstr(sv_line, needle);
       while (substring) {
         size_t substring_size = substring - sv_line.cstr;
         Sv sv1 = sv_chop_by_size(&sv_line, substring_size);
@@ -141,7 +156,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
 
         acc = acc + substring_size;
 
-        Sv sv_needle = sv_chop_by_size(&sv_line, strlen(list_window.needle.line));
+        Sv sv_needle = sv_chop_by_size(&sv_line, needle.size);
 
         Sv blue_fg = sv_from_cstr("\x1b[34m", 5);
         hui_put_text_at_window(win, blue_fg.cstr, blue_fg.size, i + y, x + acc);
@@ -150,7 +165,12 @@ void hui_draw_list_window(Hui_List_Window list_window) {
         hui_put_text_at_window(win, reset_fg.cstr, reset_fg.size, i + y, x + acc);
         acc = acc + sv_needle.size;
 
-        substring = strstr(sv_line.cstr, list_window.needle.line);
+        char* result = sv_strstr(sv_line, needle);
+        
+        // TODO find a better way to solve this; Sometimes the strstr return the same as before, this is likely an logic error above
+        if (result == substring) break;
+
+        substring = result;
       }
 
     }
