@@ -43,12 +43,17 @@ void push_line(Lines* lines, Line line) {
 #define MAX_BUFFER_SIZE 4096
 
 typedef struct {
+  size_t y;
+  size_t x;
+} Hui_List_Offset;
+
+typedef struct {
   size_t width;
   size_t height;
   size_t x;
   size_t y;
   Lines lines;
-  size_t cursor;
+  Hui_List_Offset offset;
   Line needle;
   uint8_t following;
 } Hui_List_Window;
@@ -108,13 +113,23 @@ void hui_draw_list_window(Hui_List_Window list_window) {
   size_t n = list_window.lines.count < height ? list_window.lines.count : height;
 
   for (size_t i = 0; i < n; i++) {
-    uint64_t offset = i + list_window.cursor;
+    uint64_t offset_y = i + list_window.offset.y;
+    uint64_t offset_x = list_window.offset.x;
 
-    if (offset > list_window.lines.count) break;
+    if (offset_y > list_window.lines.count) break;
 
-    Line line = list_window.lines.lines[offset];
-
-    Sv sv_line = sv_from_cstr(line.line, line.count);
+    Line line = list_window.lines.lines[offset_y];
+    
+    Sv sv_line;
+    if (offset_x > line.count) {
+      sv_line = sv_from_cstr("", 0);
+    } else {
+      if (line.count > list_window.width) {
+        sv_line = sv_from_cstr(line.line + offset_x, list_window.width);
+      } else {
+        sv_line = sv_from_cstr(line.line + offset_x, line.count - offset_x);
+      }
+    }
 
     size_t acc = 0;
 
@@ -155,7 +170,7 @@ void hui_free_list_window(Hui_List_Window list_window) {
 }
 
 void hui_go_up_list_window(Hui_List_Window* list_window) {
-  if (list_window->cursor > 0) list_window->cursor--;
+  if (list_window->offset.y > 0) list_window->offset.y--;
 }
 
 void hui_page_up_list_window(Hui_List_Window* list_window) {
@@ -166,7 +181,7 @@ void hui_page_up_list_window(Hui_List_Window* list_window) {
 
 void hui_go_down_list_window(Hui_List_Window* list_window) {
   size_t n = list_window->lines.count;
-  size_t cursor = list_window->cursor;
+  size_t cursor = list_window->offset.y;
   size_t height = list_window->height;
 
   if (n < height) return;
@@ -175,7 +190,7 @@ void hui_go_down_list_window(Hui_List_Window* list_window) {
     return ;
   }
 
-  if (n > 0 && cursor < n -1) list_window->cursor++;
+  if (n > 0 && cursor < n -1) list_window->offset.y++;
 }
 
 void hui_page_down_list_window(Hui_List_Window* list_window) {
@@ -186,10 +201,18 @@ void hui_page_down_list_window(Hui_List_Window* list_window) {
 
 void hui_end_list_window(Hui_List_Window* list_window) {
   if (list_window->lines.count > list_window->height) {
-    list_window->cursor = list_window->lines.count - list_window->height;
+    list_window->offset.y = list_window->lines.count - list_window->height;
   } else {
-    list_window->cursor = 0;
+    list_window->offset.y = 0;
   }
+}
+
+void hui_go_left_list_window(Hui_List_Window* list_window) {
+  if (list_window->offset.x > 0) list_window->offset.x--;
+}
+
+void hui_go_right_list_window(Hui_List_Window* list_window) {
+  list_window->offset.x++;
 }
 
 void hui_push_line_list_window(Hui_List_Window* list_window, Line line) {
@@ -204,15 +227,15 @@ void hui_push_line_list_window(Hui_List_Window* list_window, Line line) {
 }
 
 void hui_home_list_window(Hui_List_Window* list_window) {
-  list_window->cursor = 0;
+  list_window->offset.y = 0;
 }
 
 int hui_go_to_next_occurrence(Hui_List_Window* list_window) {
   if (!list_window->needle.line && list_window->needle.count == 0) return 0;
 
-  for (size_t i = list_window->cursor + 1; i < list_window->lines.count; i++) {
+  for (size_t i = list_window->offset.y + 1; i < list_window->lines.count; i++) {
     if (strstr(list_window->lines.lines[i].line, list_window->needle.line)) {
-     list_window->cursor = i;
+     list_window->offset.y = i;
      return 1;
     }
   }
@@ -223,15 +246,15 @@ int hui_go_to_next_occurrence(Hui_List_Window* list_window) {
 int hui_go_to_previous_occurrence(Hui_List_Window* list_window) {
   if (!list_window->needle.line && list_window->needle.count == 0) return 0;
 
-  if (list_window->cursor == 0) {
+  if (list_window->offset.y == 0) {
     return 0;
   }
 
-  size_t i = list_window->cursor - 1;
+  size_t i = list_window->offset.y - 1;
 
   while (1) {
     if (strstr(list_window->lines.lines[i].line, list_window->needle.line)) {
-     list_window->cursor = i;
+     list_window->offset.y = i;
      return 1;
     }
 
@@ -378,6 +401,14 @@ uint8_t handle_input(Tailess_Context* context) {
       updated = 1;
       context->list_window.following = 0;
       hui_go_up_list_window(&context->list_window);
+    } else if (ch == 'h') {
+      updated = 1;
+      context->list_window.following = 0;
+      hui_go_left_list_window(&context->list_window);
+    } else if (ch == 'l') {
+      updated = 1;
+      context->list_window.following = 0;
+      hui_go_right_list_window(&context->list_window);
     } else if (ch == 'N') {
       hui_go_to_previous_occurrence(&context->list_window);
       context->list_window.following = 0;
