@@ -265,7 +265,7 @@ void hui_put_text_at(char* c, size_t size, uint64_t y, uint64_t x) {
     char* end_chunk = 0;
 
     for (size_t i = 0; i < size; i++) {
-      if (c[i] == '\x1b' && c[i+1] == '[') {
+      if (c[i] == '\x1b' && i+1 < size && c[i+1] == '[') {
         ansi_escape = 1;
         skip=+2;
         start_chunk = &c[i+2];

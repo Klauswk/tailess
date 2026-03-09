@@ -129,7 +129,7 @@ void hui_draw_list_window(Hui_List_Window list_window) {
     uint64_t offset_y = i + list_window.offset.y;
     uint64_t offset_x = list_window.offset.x;
 
-    if (offset_y > list_window.lines.count) break;
+    if (offset_y >= list_window.lines.count) break;
 
     Line line = list_window.lines.lines[offset_y];
     
@@ -308,8 +308,9 @@ uint8_t handle_read_data(Tailess_Context* context)
           if (buffer[i] == '\n') {
             Line line = {0};
             line.count = b2_size;
-            line.line = malloc(sizeof(char) * line.count);
-            strncpy(line.line, buffer2, b2_size);
+            line.line = malloc(sizeof(char) * line.count + 1);
+            strncpy(line.line, buffer2, line.count);
+            line.line[line.count] = '\0';
             b2_size = 0;
             hui_push_line_list_window(&context->list_window, line);
             updated = 1;
@@ -319,8 +320,9 @@ uint8_t handle_read_data(Tailess_Context* context)
             if (b2_size >= MAX_BUFFER_SIZE - 1) {
               Line line = {0};
               line.count = b2_size;
-              line.line = malloc(sizeof(char) * line.count);
-              strncpy(line.line, buffer2, b2_size);
+              line.line = malloc(sizeof(char) * line.count + 1);
+              strncpy(line.line, buffer2, line.count);
+              line.line[line.count] = '\0';
               b2_size = 0;
               hui_push_line_list_window(&context->list_window, line);
               updated = 1;
@@ -513,7 +515,7 @@ int main(int argc, char** args) {
   context.input_window = hui_create_input_window(context.window.width, 1, context.window.height - 1, 0);
   context.message_window = hui_create_window(context.window.width, 1, context.window.height - 2, 0);
   context.list_window.following = follow;
-  //hui_use_retain_mode();
+  hui_use_retain_mode();
 
   while(1) {
 
